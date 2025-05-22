@@ -10,33 +10,26 @@ import {
   Button,
   Chip,
 } from '@mui/material';
+import { prompts } from '../data/prompts';
 
-// 임시 데이터
-const prompts = [
-  {
-    id: 1,
-    title: '웹 애플리케이션 개발 프롬프트',
-    description: 'React와 Node.js를 사용한 웹 애플리케이션 개발을 위한 프롬프트',
-    category: '웹 개발',
-    tags: ['React', 'Node.js', '웹 개발'],
-  },
-  {
-    id: 2,
-    title: '데이터 분석 프롬프트',
-    description: 'Python을 사용한 데이터 분석 및 시각화를 위한 프롬프트',
-    category: '데이터 과학',
-    tags: ['Python', '데이터 분석', '시각화'],
-  },
-  {
-    id: 3,
-    title: '머신러닝 모델 개발 프롬프트',
-    description: 'TensorFlow를 사용한 머신러닝 모델 개발을 위한 프롬프트',
-    category: 'AI/ML',
-    tags: ['TensorFlow', '머신러닝', 'AI'],
-  },
-];
+const dataScienceLabelMap: { [key: string]: string } = {
+  analysis: '분석',
+  visualization: '시각화',
+  preprocessing: '전처리',
+  forecasting: '시계열 예측',
+  clustering: '클러스터링',
+  regression: '회귀 분석',
+};
 
 const PromptList = () => {
+  const promptList = Object.entries(prompts).flatMap(([category, subCategories]) =>
+    Object.entries(subCategories).map(([subCategory, prompt]) => ({
+      category,
+      subCategory,
+      ...prompt,
+    }))
+  );
+
   return (
     <Container maxWidth="lg">
       <Typography variant="h4" component="h1" gutterBottom sx={{ mt: 4 }}>
@@ -44,35 +37,40 @@ const PromptList = () => {
       </Typography>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 3 }}>
-        {prompts.map((prompt) => (
-          <Box key={prompt.id}>
+        {promptList.map((prompt) => (
+          <Box key={`${prompt.category}-${prompt.subCategory}`}>
             <Card>
               <CardContent>
                 <Typography variant="h5" component="h2" gutterBottom>
-                  {prompt.title}
+                  {prompt.category === 'react' && (
+                    <>React - {prompt.subCategory === 'component' ? '컴포넌트' : prompt.subCategory === 'api' ? 'API' : prompt.subCategory === 'form' ? '폼' : prompt.subCategory === 'table' ? '테이블' : prompt.subCategory}</>
+                  )}
+                  {prompt.category === 'dataScience' && (
+                    <>데이터 과학 - {dataScienceLabelMap[prompt.subCategory] || prompt.subCategory}</>
+                  )}
+                  {prompt.category === 'ai' && (
+                    <>AI - {prompt.subCategory === 'classification' ? '분류' : prompt.subCategory === 'nlp' ? '자연어 처리' : prompt.subCategory === 'recommendation' ? '추천 시스템' : prompt.subCategory}</>
+                  )}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  {prompt.description}
+                  {prompt.example.description}
                 </Typography>
-                <Typography variant="subtitle2" color="primary" gutterBottom>
-                  {prompt.category}
-                </Typography>
-                <div>
-                  {prompt.tags.map((tag) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {prompt.example.requirements.map((req, index) => (
                     <Chip
-                      key={tag}
-                      label={tag}
+                      key={index}
+                      label={req}
                       size="small"
-                      sx={{ mr: 1, mb: 1 }}
+                      variant="outlined"
                     />
                   ))}
-                </div>
+                </Box>
               </CardContent>
               <CardActions>
                 <Button
                   size="small"
                   component={RouterLink}
-                  to={`/prompts/${prompt.id}`}
+                  to={`/prompts/${prompt.category}/${prompt.subCategory}`}
                 >
                   자세히 보기
                 </Button>

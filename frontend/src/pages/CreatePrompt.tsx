@@ -7,24 +7,49 @@ import {
   Button,
   Box,
   Autocomplete,
+  Paper,
+  Divider,
 } from '@mui/material';
+import { prompts } from '../data/prompts';
 
-const categories = ['웹 개발', '데이터 과학', 'AI/ML', '모바일 개발', '게임 개발'];
-const tagOptions = ['React', 'Node.js', 'Python', 'TensorFlow', '웹 개발', '데이터 분석', '시각화', '머신러닝', 'AI'];
+const categories = Object.keys(prompts);
+const subCategories = {
+  react: ['component', 'api'],
+  dataScience: ['analysis'],
+};
 
 const CreatePrompt = () => {
   const navigate = useNavigate();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [category, setCategory] = useState<string>('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [content, setContent] = useState('');
+  const [subCategory, setSubCategory] = useState<string>('');
+  const [description, setDescription] = useState('');
+  const [requirements, setRequirements] = useState<string[]>([]);
+  const [currentRequirement, setCurrentRequirement] = useState('');
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    if (!category || !subCategory) return;
+
+    const template = prompts[category][subCategory].template;
+    const prompt = template
+      .replace('{description}', description)
+      .replace('{requirements}', requirements.join('\n- '));
+
     // TODO: API 연동
-    console.log({ title, description, category, tags, content });
+    console.log(prompt);
     navigate('/prompts');
+  };
+
+  const handleAddRequirement = () => {
+    if (currentRequirement.trim()) {
+      setRequirements([...requirements, currentRequirement.trim()]);
+      setCurrentRequirement('');
+    }
+  };
+
+  const handleRemoveRequirement = (index: number) => {
+    setRequirements(requirements.filter((_, i) => i !== index));
   };
 
   return (
@@ -34,14 +59,57 @@ const CreatePrompt = () => {
       </Typography>
 
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 4 }}>
-        <TextField
-          fullWidth
-          label="제목"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
+        <Autocomplete
+          options={categories}
+          value={category}
+          onChange={(_, newValue) => {
+            setCategory(newValue || '');
+            setSubCategory('');
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="카테고리"
+              required
+            />
+          )}
           sx={{ mb: 3 }}
         />
+
+        {category && (
+          <Autocomplete
+            options={subCategories[category as keyof typeof subCategories] || []}
+            value={subCategory}
+            onChange={(_, newValue) => setSubCategory(newValue || '')}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="하위 카테고리"
+                required
+              />
+            )}
+            sx={{ mb: 3 }}
+          />
+        )}
+
+        {subCategory && (
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              예시
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              설명: {prompts[category][subCategory].example.description}
+            </Typography>
+            <Typography variant="body1" gutterBottom>
+              요구사항:
+            </Typography>
+            <ul>
+              {prompts[category][subCategory].example.requirements.map((req, index) => (
+                <li key={index}>{req}</li>
+              ))}
+            </ul>
+          </Paper>
+        )}
 
         <TextField
           fullWidth
@@ -54,53 +122,53 @@ const CreatePrompt = () => {
           sx={{ mb: 3 }}
         />
 
-        <Autocomplete
-          options={categories}
-          value={category}
-          onChange={(_, newValue) => setCategory(newValue || '')}
-          renderInput={(params) => (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            요구사항
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
             <TextField
-              {...params}
-              label="카테고리"
-              required
+              fullWidth
+              label="요구사항 추가"
+              value={currentRequirement}
+              onChange={(e) => setCurrentRequirement(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddRequirement();
+                }
+              }}
             />
-          )}
-          sx={{ mb: 3 }}
-        />
-
-        <Autocomplete
-          multiple
-          options={tagOptions}
-          value={tags}
-          onChange={(_, newValue) => setTags(newValue)}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="태그"
-              placeholder="태그를 선택하세요"
-            />
-          )}
-          sx={{ mb: 3 }}
-        />
-
-        <TextField
-          fullWidth
-          label="프롬프트 내용"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          multiline
-          rows={10}
-          required
-          sx={{ mb: 3 }}
-        />
+            <Button
+              variant="contained"
+              onClick={handleAddRequirement}
+              disabled={!currentRequirement.trim()}
+            >
+              추가
+            </Button>
+          </Box>
+          {requirements.map((req, index) => (
+            <Box key={index} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Typography sx={{ flex: 1 }}>• {req}</Typography>
+              <Button
+                size="small"
+                color="error"
+                onClick={() => handleRemoveRequirement(index)}
+              >
+                삭제
+              </Button>
+            </Box>
+          ))}
+        </Box>
 
         <Button
           type="submit"
           variant="contained"
           color="primary"
           size="large"
+          disabled={!category || !subCategory || !description || requirements.length === 0}
         >
-          작성하기
+          프롬프트 생성
         </Button>
       </Box>
     </Container>
