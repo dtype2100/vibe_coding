@@ -1,4 +1,5 @@
 # 바이브 코딩 프롬프트 가이드
+![vibecoding](https://github.com/user-attachments/assets/d7068fc0-54dd-4d27-bdf7-d321527d909b)
 
 바이브 코딩을 위한 프롬프트 가이드 웹사이트입니다. 이 프로젝트는 개발자들이 효과적인 프롬프트를 작성하고 공유할 수 있는 플랫폼을 제공합니다.
 
