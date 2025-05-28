@@ -7,170 +7,195 @@ import {
   Button,
   Box,
   Autocomplete,
-  Paper,
-  Divider,
+  Paper, // Keep Paper for grouping if desired
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  FormHelperText,
+  CircularProgress,
+  Alert
 } from '@mui/material';
-import { prompts } from '../data/prompts';
-
-const categories = Object.keys(prompts);
-const subCategories = {
-  react: ['component', 'api'],
-  dataScience: ['analysis'],
-};
+import { createPrompt, getAllCategories, Category as CategoryType, Prompt } from '../services/api';
+import { useLocation } from 'react-router-dom';
 
 const CreatePrompt = () => {
   const navigate = useNavigate();
-  const [category, setCategory] = useState<string>('');
-  const [subCategory, setSubCategory] = useState<string>('');
-  const [description, setDescription] = useState('');
-  const [requirements, setRequirements] = useState<string[]>([]);
-  const [currentRequirement, setCurrentRequirement] = useState('');
+  const location = useLocation();
+  const state = location.state as { initialTitle?: string; initialContent?: string } | undefined;
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const [title, setTitle] = useState<string>(state?.initialTitle || '');
+  const [description, setDescription] = useState<string>(''); // Optional field
+  const [content, setContent] = useState<string>(state?.initialContent || '');
+  const [categoryId, setCategoryId] = useState<string>(''); // Store as string for Select, convert to number on submit
+  const [tagsInput, setTagsInput] = useState<string>(''); // Comma-separated tags
+
+  const [categories, setCategories] = useState<CategoryType[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const data = await getAllCategories();
+        setCategories(data);
+      } catch (err) {
+        console.error('Failed to fetch categories', err);
+        setError('카테고리 목록을 불러오는데 실패했습니다.');
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
+  
+  // Clear messages when form inputs change
+  useEffect(() => {
+    setError(null);
+    setSuccessMessage(null);
+  }, [title, description, content, categoryId, tagsInput]);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    if (!category || !subCategory) return;
+    setError(null);
+    setSuccessMessage(null);
 
-    const template = prompts[category][subCategory].template;
-    const prompt = template
-      .replace('{description}', description)
-      .replace('{requirements}', requirements.join('\n- '));
-
-    // TODO: API 연동
-    console.log(prompt);
-    navigate('/prompts');
-  };
-
-  const handleAddRequirement = () => {
-    if (currentRequirement.trim()) {
-      setRequirements([...requirements, currentRequirement.trim()]);
-      setCurrentRequirement('');
+    if (!title.trim() || !content.trim() || !categoryId) {
+      setError('제목, 내용, 카테고리는 필수 항목입니다.');
+      return;
     }
-  };
 
-  const handleRemoveRequirement = (index: number) => {
-    setRequirements(requirements.filter((_, i) => i !== index));
+    setSubmitting(true);
+    const tagsArray = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag);
+
+    try {
+      const payload = {
+        title,
+        description: description.trim() || undefined, // Send undefined if empty, matching backend
+        content,
+        category_id: Number(categoryId),
+        tags: tagsArray,
+      };
+      const newPrompt: Prompt = await createPrompt(payload);
+      setSuccessMessage(`프롬프트 "${newPrompt.title}"가 성공적으로 생성되었습니다!`);
+      // Reset form or navigate
+      setTitle('');
+      setDescription('');
+      setContent('');
+      setCategoryId('');
+      setTagsInput('');
+      
+      // Navigate to the new prompt's detail page after a short delay
+      setTimeout(() => {
+        navigate(`/prompts/${newPrompt.id}`);
+      }, 1500);
+
+    } catch (err: any) {
+      console.error('Failed to create prompt:', err);
+      setError(err.response?.data?.error || err.message || '프롬프트 생성에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Container maxWidth="md">
-      <Typography variant="h4" component="h1" gutterBottom sx={{ mt: 4 }}>
-        프롬프트 작성
+      <Typography variant="h4" component="h1" gutterBottom sx={{ mt: 4, mb: 3 }}>
+        새 프롬프트 작성
       </Typography>
 
-      <Box component="form" onSubmit={handleSubmit} sx={{ mt: 4 }}>
-        <Autocomplete
-          options={categories}
-          value={category}
-          onChange={(_, newValue) => {
-            setCategory(newValue || '');
-            setSubCategory('');
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="카테고리"
-              required
-            />
-          )}
+      <Paper component="form" onSubmit={handleSubmit} sx={{ p: { xs: 2, md: 3 } }}>
+        <TextField
+          fullWidth
+          label="제목"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
           sx={{ mb: 3 }}
+          disabled={submitting}
         />
 
-        {category && (
-          <Autocomplete
-            options={subCategories[category as keyof typeof subCategories] || []}
-            value={subCategory}
-            onChange={(_, newValue) => setSubCategory(newValue || '')}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="하위 카테고리"
-                required
-              />
+        <FormControl fullWidth sx={{ mb: 3 }} required disabled={loadingCategories || submitting}>
+          <InputLabel id="category-select-label">카테고리</InputLabel>
+          <Select
+            labelId="category-select-label"
+            id="category-select"
+            value={categoryId}
+            label="카테고리"
+            onChange={(e) => setCategoryId(e.target.value as string)}
+          >
+            {loadingCategories ? (
+              <MenuItem value="" disabled><em>로딩 중...</em></MenuItem>
+            ) : categories.length === 0 ? (
+              <MenuItem value="" disabled><em>카테고리를 찾을 수 없습니다.</em></MenuItem>
+            ) : (
+              categories.map((cat) => (
+                <MenuItem key={cat.id} value={String(cat.id)}>
+                  {cat.name}
+                </MenuItem>
+              ))
             )}
-            sx={{ mb: 3 }}
-          />
-        )}
-
-        {subCategory && (
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              예시
-            </Typography>
-            <Typography variant="body1" gutterBottom>
-              설명: {prompts[category][subCategory].example.description}
-            </Typography>
-            <Typography variant="body1" gutterBottom>
-              요구사항:
-            </Typography>
-            <ul>
-              {prompts[category][subCategory].example.requirements.map((req, index) => (
-                <li key={index}>{req}</li>
-              ))}
-            </ul>
-          </Paper>
-        )}
+          </Select>
+          {!loadingCategories && categories.length === 0 && <FormHelperText error>카테고리 로딩 실패 또는 없음</FormHelperText>}
+        </FormControl>
 
         <TextField
           fullWidth
-          label="설명"
+          label="설명 (선택 사항)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           multiline
           rows={3}
-          required
           sx={{ mb: 3 }}
+          disabled={submitting}
         />
 
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            요구사항
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-            <TextField
-              fullWidth
-              label="요구사항 추가"
-              value={currentRequirement}
-              onChange={(e) => setCurrentRequirement(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddRequirement();
-                }
-              }}
-            />
-            <Button
-              variant="contained"
-              onClick={handleAddRequirement}
-              disabled={!currentRequirement.trim()}
-            >
-              추가
-            </Button>
-          </Box>
-          {requirements.map((req, index) => (
-            <Box key={index} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <Typography sx={{ flex: 1 }}>• {req}</Typography>
-              <Button
-                size="small"
-                color="error"
-                onClick={() => handleRemoveRequirement(index)}
-              >
-                삭제
-              </Button>
-            </Box>
-          ))}
-        </Box>
+        <TextField
+          fullWidth
+          label="프롬프트 내용"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          multiline
+          rows={6}
+          required
+          sx={{ mb: 3 }}
+          disabled={submitting}
+          InputProps={{
+            sx: {
+              fontFamily: 'monospace', // Good for code/templates
+            },
+          }}
+        />
 
-        <Button
-          type="submit"
-          variant="contained"
-          color="primary"
-          size="large"
-          disabled={!category || !subCategory || !description || requirements.length === 0}
-        >
-          프롬프트 생성
-        </Button>
-      </Box>
+        <TextField
+          fullWidth
+          label="태그 (쉼표로 구분)"
+          value={tagsInput}
+          onChange={(e) => setTagsInput(e.target.value)}
+          helperText="예: react, typescript, api"
+          sx={{ mb: 3 }}
+          disabled={submitting}
+        />
+        
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {successMessage && <Alert severity="success" sx={{ mb: 2 }}>{successMessage}</Alert>}
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            size="large"
+            disabled={submitting || loadingCategories || !title.trim() || !content.trim() || !categoryId}
+            startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {submitting ? '생성 중...' : '프롬프트 생성'}
+          </Button>
+        </Box>
+      </Paper>
     </Container>
   );
 };
