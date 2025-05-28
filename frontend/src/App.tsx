@@ -27,7 +27,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/prompts" element={<PromptList />} />
-          <Route path="/prompts/:category/:subCategory" element={<PromptDetail />} />
+          <Route path="/prompts/:id" element={<PromptDetail />} /> {/* Updated route */}
           <Route path="/create" element={<CreatePrompt />} />
         </Routes>
       </Router>
